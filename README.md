@@ -419,6 +419,7 @@ Ready-to-use workflow recipes in `skills/` (also available as `/slash-commands` 
 | `/fk-gen-refs` | Generate reference images for all entities |
 | `/fk-gen-images` | Generate scene images with character refs |
 | `/fk-gen-videos` | Generate videos from scene images |
+| `/fk-upscale-4k` | Upscale completed videos to 4K + auto-download (PAYGATE_TIER_TWO) |
 | `/fk-concat` | Download + merge all scene videos |
 
 ### Advanced Video
@@ -761,11 +762,11 @@ MIT
 
 <p align="center">
   <a href="https://www.facebook.com/groups/vibecodeera">
-    <img src="https://img.shields.io/badge/Join%20the%20Vibe%20%26%20Code%20%26%20ERA%20on%20Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white" alt="Join the Vibe Code ERA Facebook Group" />
+    <img src="https://img.shields.io/badge/Join%20the%20Community-Vibe%20Code%20Era%20on%20Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white" alt="Join the Vibe Code Era Facebook Group" />
   </a>
 </p>
 
-The shared community for anything crazy and useful created with Vibe Code.. Drop in to:
+**Share anything crazy and useful created with Vibe Code.** Drop in to:
 
 - Post the story-video runs and thumbnails you've generated
 - Share scene templates, prompt recipes, and reference-image setups
