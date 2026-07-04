@@ -761,16 +761,18 @@ MIT
 
 <p align="center">
   <a href="https://www.facebook.com/groups/vibecodeera">
-    <img src="https://img.shields.io/badge/Join%20the%20Community-FlowKit%20%26%20Flowboard%20on%20Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white" alt="Join the Vibe Code ERA Facebook Group" />
+    <img src="https://img.shields.io/badge/Join%20the%20Vibe%20%26%20Code%20%26%20ERA%20on%20Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white" alt="Join the Vibe Code ERA Facebook Group" />
   </a>
 </p>
 
-The shared community for both **FlowKit** and **Flowboard**. Drop in to:
+The shared community for anything crazy and useful created with Vibe Code.. Drop in to:
 
 - Post the story-video runs and thumbnails you've generated
 - Share scene templates, prompt recipes, and reference-image setups
 - Ask for help when an output isn't matching what you imagined
 - Request features and report bugs you've hit in the wild
 - Trade tips on Google Flow plan limits, Veo i2v behaviour, and Chrome extension setup
+- Facebook Post via Extension MCP
+- Right way to build Mobile Application + System
 
-→ **[facebook.com/groups/flowkit.flowboard.community](https://www.facebook.com/groups/flowkit.flowboard.community)**
+→ **[facebook.com/groups/vibecodeera](https://www.facebook.com/groups/vibecodeera)**
