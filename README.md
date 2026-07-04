@@ -760,8 +760,8 @@ MIT
 ## Community & Support
 
 <p align="center">
-  <a href="https://www.facebook.com/groups/flowkit.flowboard.community">
-    <img src="https://img.shields.io/badge/Join%20the%20Community-FlowKit%20%26%20Flowboard%20on%20Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white" alt="Join the FlowKit & Flowboard Facebook Group" />
+  <a href="https://www.facebook.com/groups/vibecodeera">
+    <img src="https://img.shields.io/badge/Join%20the%20Community-FlowKit%20%26%20Flowboard%20on%20Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white" alt="Join the Vibe Code ERA Facebook Group" />
   </a>
 </p>
 
