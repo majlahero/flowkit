@@ -107,6 +107,16 @@ export interface Request {
   updated_at: string
 }
 
+export interface Material {
+  id: string
+  name: string
+  style_instruction: string
+  negative_prompt: string | null
+  scene_prefix: string | null
+  lighting: string
+  is_builtin: boolean
+}
+
 // WebSocket event
 export interface WSEvent {
   type: string

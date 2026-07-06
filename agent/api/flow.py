@@ -47,6 +47,13 @@ class UploadImageRequest(BaseModel):
     file_name: str = "image.png"
 
 
+class UploadImageDataRequest(BaseModel):
+    image_base64: str  # base64-encoded image bytes (data URL prefix is stripped if present)
+    mime_type: str = "image/png"
+    project_id: str = ""
+    file_name: str = "image.png"
+
+
 class CheckStatusRequest(BaseModel):
     operations: list[dict]
 
@@ -203,6 +210,26 @@ async def upload_image(body: UploadImageRequest):
     b64 = base64.b64encode(image_bytes).decode()
     mime = mimetypes.guess_type(body.file_path)[0] or "image/png"
     result = await client.upload_image(b64, mime_type=mime, project_id=body.project_id, file_name=body.file_name)
+    if result.get("error") or (isinstance(result.get("status"), int) and result["status"] >= 400):
+        raise HTTPException(result.get("status", 502), result.get("error", result.get("data")))
+    media_id = result.get("_mediaId")
+    return {"media_id": media_id, "raw": result.get("data", result)}
+
+
+@router.post("/upload-image-file")
+async def upload_image_file(body: UploadImageDataRequest):
+    """Upload an image sent from the browser as base64 JSON and get a media_id.
+
+    Same as /upload-image but accepts the raw base64 payload directly (no local
+    file read, no multipart/UploadFile dependency).
+    """
+    client = get_flow_client()
+    if not client.connected:
+        raise HTTPException(503, "Extension not connected")
+    b64 = body.image_base64
+    if "base64," in b64:
+        b64 = b64.split("base64,", 1)[1]
+    result = await client.upload_image(b64, mime_type=body.mime_type, project_id=body.project_id, file_name=body.file_name)
     if result.get("error") or (isinstance(result.get("status"), int) and result["status"] >= 400):
         raise HTTPException(result.get("status", 502), result.get("error", result.get("data")))
     media_id = result.get("_mediaId")
