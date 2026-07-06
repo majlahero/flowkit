@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { fetchAPI, postAPI, patchAPI } from '../api/client'
 import type { Project, Character, Video, Scene, StatusType, Orientation } from '../types'
 import { useWebSocket } from '../api/useWebSocket'
-import { ArrowLeft, Plus, Trash2, Image as ImageIcon, Film, Users, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Image as ImageIcon, Film, Users, Sparkles, Mic, Combine, AlertTriangle, CheckCircle } from 'lucide-react'
 
 // ---- shared styled primitives (match CreatePage / ProjectDetailPage) ----
 
@@ -68,6 +68,9 @@ function vidStatus(s: Scene, o: Ori): StatusType {
 function vidUrl(s: Scene, o: Ori): string | null {
   return o === 'horizontal' ? s.horizontal_video_url : s.vertical_video_url
 }
+function upStatus(s: Scene, o: Ori): StatusType {
+  return o === 'horizontal' ? s.horizontal_upscale_status : s.vertical_upscale_status
+}
 
 function normalizeCharNames(raw: string[] | string | null): string[] {
   if (!raw) return []
@@ -90,6 +93,24 @@ interface BatchStatus {
   done: boolean
   all_succeeded: boolean
   orientation: string | null
+}
+
+interface VoiceTemplate {
+  name: string
+  audio_path: string
+  duration: number | null
+}
+
+interface NarrateResult {
+  scenes_narrated: number
+  scenes_skipped: number
+  scenes_failed: number
+}
+
+interface ConcatResult {
+  success: boolean
+  output_path: string
+  scene_count: number
 }
 
 function ProgressBar({ label, prog }: { label: string; prog: BatchStatus | null }) {
@@ -148,6 +169,7 @@ function SceneCard({
 }) {
   const [prompt, setPrompt] = useState(scene.prompt ?? '')
   const [videoPrompt, setVideoPrompt] = useState(scene.video_prompt ?? '')
+  const [narratorText, setNarratorText] = useState(scene.narrator_text ?? '')
   const [names, setNames] = useState<string[]>(normalizeCharNames(scene.character_names))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -157,12 +179,14 @@ function SceneCard({
   useEffect(() => {
     setPrompt(scene.prompt ?? '')
     setVideoPrompt(scene.video_prompt ?? '')
+    setNarratorText(scene.narrator_text ?? '')
     setNames(normalizeCharNames(scene.character_names))
-  }, [scene.id, scene.prompt, scene.video_prompt, scene.character_names])
+  }, [scene.id, scene.prompt, scene.video_prompt, scene.narrator_text, scene.character_names])
 
   const dirty =
     prompt !== (scene.prompt ?? '') ||
     videoPrompt !== (scene.video_prompt ?? '') ||
+    narratorText !== (scene.narrator_text ?? '') ||
     JSON.stringify(names) !== JSON.stringify(normalizeCharNames(scene.character_names))
 
   function toggleName(n: string) {
@@ -176,6 +200,7 @@ function SceneCard({
       await patchAPI(`/api/scenes/${scene.id}`, {
         prompt,
         video_prompt: videoPrompt,
+        narrator_text: narratorText,
         character_names: names,
       })
       onReload()
@@ -257,6 +282,17 @@ function SceneCard({
           className="rounded px-2 py-1.5 text-xs outline-none resize-y"
           style={inputStyle}
           placeholder="VD: Máy quay đi theo nhân vật, lá cây rung nhẹ trong gió"
+        />
+      </Field>
+
+      <Field label="LỜI DẪN / THUYẾT MINH (tùy chọn)" hint="Câu thoại narrator cho cảnh này. Dùng ở bước Lồng tiếng (TTS) khi hoàn thiện video.">
+        <textarea
+          value={narratorText}
+          onChange={e => setNarratorText(e.target.value)}
+          rows={2}
+          className="rounded px-2 py-1.5 text-xs outline-none resize-y"
+          style={inputStyle}
+          placeholder="VD: Giữa khu rừng cổ, nhân vật của chúng ta bắt đầu cuộc hành trình…"
         />
       </Field>
 
@@ -344,6 +380,17 @@ export default function StudioPage() {
   const [vidProg, setVidProg] = useState<BatchStatus | null>(null)
   const [videosDone, setVideosDone] = useState(false)
 
+  // ---- phase B: finishing (4K / TTS / concat) ----
+  const [upProg, setUpProg] = useState<BatchStatus | null>(null)
+  const [templates, setTemplates] = useState<VoiceTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [ttsRunning, setTtsRunning] = useState(false)
+  const [ttsResult, setTtsResult] = useState<string | null>(null)
+  const [withTts, setWithTts] = useState(false)
+  const [concatRunning, setConcatRunning] = useState(false)
+  const [concatResult, setConcatResult] = useState<string | null>(null)
+  const [ffmpegMissing, setFfmpegMissing] = useState(false)
+
   const pollRef = useRef<Record<string, number>>({})
   const activePollsRef = useRef(0)
 
@@ -399,6 +446,11 @@ export default function StudioPage() {
   useEffect(() => {
     if (currentVideoId) loadScenes(currentVideoId)
   }, [currentVideoId, loadScenes])
+
+  // load voice templates once (for the TTS dropdown)
+  useEffect(() => {
+    fetchAPI<VoiceTemplate[]>('/api/tts/templates').then(setTemplates).catch(() => setTemplates([]))
+  }, [])
 
   // WS: while something is generating, refresh scenes early on any event
   useEffect(() => {
@@ -583,6 +635,73 @@ export default function StudioPage() {
     }
   }
 
+  // ---- phase B: finishing actions ----
+
+  async function genAll4K() {
+    if (!project || !currentVideoId || scenes.length === 0) return
+    setActionError(null)
+    if (!(await ensureFlow())) return
+    try {
+      await postAPI('/api/requests/batch', {
+        requests: scenes.map(s => ({
+          type: 'UPSCALE_VIDEO',
+          scene_id: s.id,
+          project_id: project.id,
+          video_id: currentVideoId,
+          orientation: ORIENT(ori),
+        })),
+      })
+      startPoll(
+        'up',
+        `video_id=${currentVideoId}&type=UPSCALE_VIDEO&orientation=${ORIENT(ori)}`,
+        setUpProg,
+        () => loadScenes(currentVideoId),
+      )
+    } catch (e) {
+      setActionError(errMsg(e))
+    }
+  }
+
+  async function runNarrate() {
+    if (!project || !currentVideoId) return
+    setActionError(null)
+    setTtsResult(null)
+    setTtsRunning(true)
+    try {
+      const r = await postAPI<NarrateResult>(`/api/videos/${currentVideoId}/narrate`, {
+        project_id: project.id,
+        orientation: ORIENT(ori),
+        ...(selectedTemplate ? { template: selectedTemplate } : {}),
+      })
+      setTtsResult(`Đã lồng tiếng ${r.scenes_narrated} cảnh (bỏ qua ${r.scenes_skipped}, lỗi ${r.scenes_failed}).`)
+    } catch (e) {
+      setActionError(errMsg(e))
+    } finally {
+      setTtsRunning(false)
+    }
+  }
+
+  async function runConcat() {
+    if (!currentVideoId) return
+    setActionError(null)
+    setConcatResult(null)
+    setFfmpegMissing(false)
+    setConcatRunning(true)
+    try {
+      const r = await postAPI<ConcatResult>(`/api/videos/${currentVideoId}/concat`, { with_tts: withTts })
+      setConcatResult(r.output_path)
+    } catch (e) {
+      const m = errMsg(e)
+      if (m.includes('503') || m.toLowerCase().includes('ffmpeg')) {
+        setFfmpegMissing(true)
+      } else {
+        setActionError(m)
+      }
+    } finally {
+      setConcatRunning(false)
+    }
+  }
+
   // ---- render ----
 
   if (loading || !project) {
@@ -594,6 +713,11 @@ export default function StudioPage() {
   const charBusy = !!pollRef.current['char']
   const imgBusy = !!pollRef.current['img']
   const vidBusy = !!pollRef.current['vid']
+  const upBusy = !!pollRef.current['up']
+
+  const allVideosReady = scenes.length > 0 && scenes.every(s => vidStatus(s, ori) === 'COMPLETED')
+  const all4kReady = scenes.length > 0 && scenes.every(s => upStatus(s, ori) === 'COMPLETED')
+  const scenesWithNarration = scenes.filter(s => (s.narrator_text ?? '').trim() !== '')
 
   return (
     <div className="flex flex-col gap-4 max-w-4xl">
@@ -847,14 +971,132 @@ export default function StudioPage() {
 
             {videosDone && (
               <div className="rounded-lg p-3 text-xs flex items-start gap-2" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid var(--green)', color: 'var(--green)' }}>
-                <RefreshCw size={13} className="mt-0.5 shrink-0" />
-                <span>
-                  Đã tạo xong video từng cảnh. Bước ghép thành 1 video hoàn chỉnh (kèm 4K + lồng tiếng)
-                  sẽ có ở bản cập nhật sau (cần ffmpeg). Bạn có thể xem trước từng cảnh ở danh sách phía trên.
-                </span>
+                <CheckCircle size={13} className="mt-0.5 shrink-0" />
+                <span>Đã tạo xong video từng cảnh. Cuộn xuống khu <b>“Hoàn thiện video”</b> để nâng 4K, lồng tiếng và ghép thành 1 video hoàn chỉnh.</span>
               </div>
             )}
           </div>
+
+          {/* HOÀN THIỆN VIDEO (chỉ hiện khi mọi cảnh đã có video) */}
+          {allVideosReady && (
+            <div className="rounded-lg p-4 flex flex-col gap-5" style={cardStyle}>
+              <div>
+                <div className="font-bold text-sm" style={{ color: 'var(--text)' }}>Hoàn thiện video</div>
+                <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+                  Tất cả cảnh đã có video. Có thể nâng 4K và lồng tiếng (đều tùy chọn), rồi ghép thành 1 video hoàn chỉnh.
+                </div>
+              </div>
+
+              {/* B1: upscale 4K (optional) */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={genAll4K}
+                    disabled={upBusy || !flowOk || all4kReady}
+                    className="text-xs px-4 py-2 rounded font-semibold flex items-center gap-1.5"
+                    style={{
+                      background: upBusy || !flowOk || all4kReady ? 'var(--card)' : 'var(--accent)',
+                      color: upBusy || !flowOk || all4kReady ? 'var(--muted)' : '#fff',
+                      border: '1px solid var(--border)',
+                      cursor: upBusy || !flowOk || all4kReady ? 'not-allowed' : 'pointer',
+                    }}
+                    title={!flowOk ? 'Cần extension kết nối + Flow key' : undefined}
+                  >
+                    <Sparkles size={13} /> {all4kReady ? 'Đã nâng 4K tất cả cảnh' : upBusy ? 'Đang nâng 4K…' : `Nâng 4K tất cả cảnh (${scenes.length})`}
+                  </button>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                    {!flowOk
+                      ? 'Cần extension kết nối + Flow key.'
+                      : 'Nâng độ phân giải lên 4K (không bắt buộc, tốn thời gian).'}
+                  </span>
+                </div>
+                <ProgressBar label="4K" prog={upProg} />
+              </div>
+
+              {/* B2: TTS narration (optional) */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={runNarrate}
+                    disabled={ttsRunning || scenesWithNarration.length === 0}
+                    className="text-xs px-4 py-2 rounded font-semibold flex items-center gap-1.5"
+                    style={{
+                      background: ttsRunning || scenesWithNarration.length === 0 ? 'var(--card)' : 'var(--accent)',
+                      color: ttsRunning || scenesWithNarration.length === 0 ? 'var(--muted)' : '#fff',
+                      border: '1px solid var(--border)',
+                      cursor: ttsRunning || scenesWithNarration.length === 0 ? 'not-allowed' : 'pointer',
+                    }}
+                    title={scenesWithNarration.length === 0 ? 'Điền LỜI DẪN cho ít nhất 1 cảnh ở khu Scenes trước' : undefined}
+                  >
+                    <Mic size={13} /> {ttsRunning ? 'Đang lồng tiếng…' : `Lồng tiếng (TTS) — ${scenesWithNarration.length} cảnh có lời dẫn`}
+                  </button>
+                  {templates.length > 0 && (
+                    <select
+                      value={selectedTemplate}
+                      onChange={e => setSelectedTemplate(e.target.value)}
+                      className="text-xs px-2 py-1.5 rounded outline-none"
+                      style={inputStyle}
+                      title="Chọn giọng đọc (voice template)"
+                    >
+                      <option value="">Giọng mặc định của project</option>
+                      {templates.map(t => (
+                        <option key={t.name} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                  {scenesWithNarration.length === 0
+                    ? 'Chưa cảnh nào có LỜI DẪN. Điền ô “LỜI DẪN / THUYẾT MINH” ở khu Scenes trước.'
+                    : 'Tạo giọng đọc lời dẫn cho video (không bắt buộc). Bản lồng tiếng được lưu để dùng khi ghép.'}
+                </span>
+                {ttsResult && (
+                  <div className="text-xs" style={{ color: 'var(--green)' }}>{ttsResult}</div>
+                )}
+              </div>
+
+              {/* B3: concat into final video */}
+              <div className="flex flex-col gap-2 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                <label className="flex items-center gap-2 text-xs mt-2" style={{ color: 'var(--muted)' }}>
+                  <input type="checkbox" checked={withTts} onChange={e => setWithTts(e.target.checked)} />
+                  Kèm lồng tiếng (dùng bản đã tạo ở bước Lồng tiếng nếu có)
+                </label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={runConcat}
+                    disabled={concatRunning || !allVideosReady}
+                    className="text-xs px-4 py-2 rounded font-semibold flex items-center gap-1.5"
+                    style={{
+                      background: concatRunning || !allVideosReady ? 'var(--card)' : 'var(--green)',
+                      color: concatRunning || !allVideosReady ? 'var(--muted)' : '#fff',
+                      border: '1px solid var(--border)',
+                      cursor: concatRunning || !allVideosReady ? 'not-allowed' : 'pointer',
+                    }}
+                    title={!allVideosReady ? 'cần tạo video tất cả cảnh trước' : undefined}
+                  >
+                    <Combine size={13} /> {concatRunning ? 'Đang ghép…' : 'GHÉP thành video hoàn chỉnh'}
+                  </button>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>cần ffmpeg trên máy</span>
+                </div>
+
+                {ffmpegMissing && (
+                  <div className="rounded-lg p-3 text-xs flex items-start gap-2" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid var(--yellow)', color: 'var(--yellow)' }}>
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                    <span>Chưa cài ffmpeg. Cài bằng: <code>winget install Gyan.FFmpeg</code> rồi thử lại.</span>
+                  </div>
+                )}
+                {concatResult && (
+                  <div className="rounded-lg p-3 text-xs flex items-start gap-2" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid var(--green)', color: 'var(--green)' }}>
+                    <CheckCircle size={13} className="mt-0.5 shrink-0" />
+                    <span>Đã ghép xong: <b style={{ wordBreak: 'break-all' }}>{concatResult}</b></span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
