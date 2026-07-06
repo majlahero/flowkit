@@ -338,3 +338,25 @@ async def list_materials() -> list[dict]:
     db = await get_db()
     cur = await db.execute("SELECT * FROM material ORDER BY created_at")
     return [dict(r) for r in await cur.fetchall()]
+
+
+# ─── App Settings (key-value store) ──────────────────────────
+
+async def get_setting(key: str) -> Optional[str]:
+    """Return the stored value for a settings key, or None if unset."""
+    db = await get_db()
+    cur = await db.execute("SELECT value FROM app_settings WHERE key=?", (key,))
+    row = await cur.fetchone()
+    return row[0] if row else None
+
+
+async def set_setting(key: str, value: str) -> None:
+    """Upsert a settings key/value pair."""
+    db = await get_db()
+    now = _now()
+    async with _db_lock:
+        await db.execute(
+            "INSERT INTO app_settings (key,value,updated_at) VALUES (?,?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+            (key, value, now))
+        await db.commit()

@@ -153,6 +153,12 @@ CREATE TABLE IF NOT EXISTS request (
     updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+    key         TEXT PRIMARY KEY,
+    value       TEXT,
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_scene_video ON scene(video_id);
 CREATE INDEX IF NOT EXISTS idx_scene_order ON scene(video_id, display_order);
 CREATE INDEX IF NOT EXISTS idx_request_status ON request(status);
