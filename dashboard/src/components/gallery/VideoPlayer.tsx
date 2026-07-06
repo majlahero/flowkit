@@ -7,8 +7,9 @@ interface VideoPlayerProps {
   onClose: () => void
 }
 
-function parseCharacterNames(raw: string | null): string[] {
+function parseCharacterNames(raw: string[] | string | null): string[] {
   if (!raw) return []
+  if (Array.isArray(raw)) return raw
   try {
     const parsed = JSON.parse(raw)
     if (Array.isArray(parsed)) return parsed

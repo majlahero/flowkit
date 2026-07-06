@@ -4,6 +4,7 @@ import { useWebSocket } from './api/useWebSocket'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
 import CreatePage from './pages/CreatePage'
+import StudioPage from './pages/StudioPage'
 import LogsPage from './pages/LogsPage'
 import GalleryPage from './pages/GalleryPage'
 
@@ -81,6 +82,7 @@ function Layout() {
             <Route path="/create" element={<CreatePage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectsPage />} />
+            <Route path="/projects/:id/studio" element={<StudioPage />} />
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
           </Routes>

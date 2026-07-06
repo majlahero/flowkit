@@ -307,6 +307,16 @@ export default function CreatePage() {
 
   return (
     <div className="flex flex-col gap-4 max-w-3xl">
+      {/* Intro / explanation */}
+      <div className="rounded-lg p-4 flex flex-col gap-1.5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <div className="font-bold text-sm" style={{ color: 'var(--text)' }}>Bắt đầu một dự án video mới</div>
+        <div className="text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>
+          Đây là bước bắt đầu một <b>DỰ ÁN VIDEO</b> mới. Bạn khai báo tên dự án, phong cách hình ảnh, và ảnh
+          nhân vật/đồ vật chính để AI giữ nguyên thiết kế xuyên suốt. Sau khi tạo xong, bạn sẽ sang phần
+          <b> dựng cảnh (Scenes)</b> để làm video.
+        </div>
+      </div>
+
       {extensionConnected === false && (
         <div className="rounded-lg p-3 text-xs flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid var(--red)', color: 'var(--red)' }}>
           <span className="flex-1">Extension chưa kết nối. Load extension trong Chrome (chrome://extensions → Load unpacked → thư mục extension\) trước khi tạo project.</span>
@@ -323,7 +333,7 @@ export default function CreatePage() {
       {/* Project info */}
       <div className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
         <div className="font-bold text-sm" style={{ color: 'var(--text)' }}>Thông tin project</div>
-        <Field label="TÊN PROJECT (bắt buộc)">
+        <Field label="TÊN PROJECT (bắt buộc)" hint="Tên dự án phim của bạn">
           <input
             value={name}
             onChange={e => setName(e.target.value)}
@@ -340,7 +350,7 @@ export default function CreatePage() {
             style={inputStyle}
           />
         </Field>
-        <Field label="STORY / NỘI DUNG (tùy chọn)">
+        <Field label="STORY / NỘI DUNG (tùy chọn)" hint="Nội dung/câu chuyện tổng quát (tùy chọn, giúp AI hiểu bối cảnh)">
           <textarea
             value={story}
             onChange={e => setStory(e.target.value)}
@@ -359,7 +369,7 @@ export default function CreatePage() {
               placeholder="en"
             />
           </Field>
-          <Field label="MATERIAL (bắt buộc)">
+          <Field label="MATERIAL (bắt buộc)" hint="Phong cách hình ảnh (thực tế / hoạt hình 3D / anime...)">
             <select
               value={material}
               onChange={e => setMaterial(e.target.value)}
@@ -379,13 +389,13 @@ export default function CreatePage() {
       <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
         <EntityBlock
           title="Nhân vật chính"
-          subtitle="AI giữ nguyên thiết kế qua mọi scene"
+          subtitle="Ảnh + tên nhân vật xuất hiện xuyên suốt. AI dùng ảnh này để vẽ nhân vật giống nhau ở mọi cảnh."
           form={character}
           onChange={setCharacter}
         />
         <EntityBlock
           title="Đồ vật chính (tùy chọn)"
-          subtitle="Để trống nếu không cần"
+          subtitle="Đồ vật quan trọng cần giữ cố định (tùy chọn). Để trống nếu không cần."
           form={object}
           onChange={setObject}
         />
@@ -405,16 +415,16 @@ export default function CreatePage() {
             cursor: canSubmit ? 'pointer' : 'not-allowed',
           }}
         >
-          {running ? 'Đang tạo…' : 'Tạo project'}
+          {running ? 'Đang tạo…' : 'Bắt đầu dự án video mới'}
         </button>
         {createdProjectId && !running && (
           <button
             type="button"
-            onClick={() => navigate(`/projects/${createdProjectId}`)}
+            onClick={() => navigate(`/projects/${createdProjectId}/studio`)}
             className="px-4 py-2 rounded text-xs font-semibold"
             style={{ background: 'var(--card)', color: 'var(--accent)', border: '1px solid var(--border)' }}
           >
-            Mở project →
+            Sang phần dựng cảnh →
           </button>
         )}
       </div>

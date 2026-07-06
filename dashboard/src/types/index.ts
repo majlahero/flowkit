@@ -43,6 +43,7 @@ export interface Video {
   description: string | null
   display_order: number
   status: string
+  orientation: Orientation | null
   vertical_url: string | null
   horizontal_url: string | null
   thumbnail_url: string | null
@@ -59,7 +60,7 @@ export interface Scene {
   prompt: string | null
   image_prompt: string | null
   video_prompt: string | null
-  character_names: string | null  // JSON string array
+  character_names: string[] | null  // API returns a parsed array
   parent_scene_id: string | null
   chain_type: ChainType
   source: string | null

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Clapperboard } from 'lucide-react'
 import { fetchAPI, patchAPI } from '../api/client'
 import type { Project, Character, Video, Scene, ChainType, StatusType } from '../types'
 import EditableText from '../components/projects/EditableText'
@@ -206,9 +208,10 @@ function ScenesTab({ videos }: { videos: Video[] }) {
       .finally(() => setLoading(false))
   }
 
-  function parseCharNames(raw: string | null): string[] {
+  function parseCharNames(raw: string[] | string | null): string[] {
     if (!raw) return []
-    try { return JSON.parse(raw) } catch { return [] }
+    if (Array.isArray(raw)) return raw
+    try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch { return [] }
   }
 
   if (videos.length === 0) {
@@ -295,6 +298,7 @@ function ScenesTab({ videos }: { videos: Video[] }) {
 
 // ---- Main ProjectDetailPage ----
 export default function ProjectDetailPage({ projectId, onBack }: Props) {
+  const navigate = useNavigate()
   const [project, setProject] = useState<Project | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
   const [videos, setVideos] = useState<Video[]>([])
@@ -337,6 +341,14 @@ export default function ProjectDetailPage({ projectId, onBack }: Props) {
           Back
         </button>
         <h1 className="font-bold text-sm" style={{ color: 'var(--text)' }}>{project.name}</h1>
+        <button
+          onClick={() => navigate(`/projects/${project.id}/studio`)}
+          className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-semibold"
+          style={{ background: 'var(--accent)', color: '#fff', border: '1px solid var(--border)' }}
+          title="Mở màn dựng cảnh: viết cảnh, tạo ảnh và tạo video từng cảnh"
+        >
+          <Clapperboard size={13} /> Dựng cảnh (Studio)
+        </button>
       </div>
 
       {/* Tabs */}
