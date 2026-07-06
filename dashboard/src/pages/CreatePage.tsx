@@ -166,17 +166,22 @@ export default function CreatePage() {
   const [object, setObject] = useState<EntityForm>({ name: '', description: '', image: null })
 
   const [extensionConnected, setExtensionConnected] = useState<boolean | null>(null)
+  const [flowKeyPresent, setFlowKeyPresent] = useState<boolean | null>(null)
   const [running, setRunning] = useState(false)
   const [steps, setSteps] = useState<Step[]>([])
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null)
+
+  function refreshFlowStatus() {
+    fetchAPI<{ connected: boolean; flow_key_present: boolean }>('/api/flow/status')
+      .then(s => { setExtensionConnected(!!s.connected); setFlowKeyPresent(!!s.flow_key_present) })
+      .catch(() => { setExtensionConnected(false); setFlowKeyPresent(false) })
+  }
 
   useEffect(() => {
     fetchAPI<Material[]>('/api/materials')
       .then(m => { setMaterials(m); if (m.length && !material) setMaterial(m[0].id) })
       .catch(console.error)
-    fetchAPI<{ extension_connected: boolean }>('/health')
-      .then(h => setExtensionConnected(!!h.extension_connected))
-      .catch(() => setExtensionConnected(false))
+    refreshFlowStatus()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -192,7 +197,7 @@ export default function CreatePage() {
 
     // Build step list
     const stepDefs: Step[] = [
-      { label: 'Kiểm tra kết nối extension', state: 'pending' },
+      { label: 'Kiểm tra extension + Flow key', state: 'pending' },
       { label: 'Tạo project trên Google Flow', state: 'pending' },
     ]
     if (character.image) stepDefs.push({ label: `Upload ảnh nhân vật "${character.name || 'nhân vật'}"`, state: 'pending' })
@@ -203,16 +208,21 @@ export default function CreatePage() {
 
     let si = 0
     try {
-      // B1: extension check
+      // B1: extension + Flow key check
       setStep(si, { state: 'running' })
-      const health = await fetchAPI<{ extension_connected: boolean }>('/health')
-      if (!health.extension_connected) {
-        setExtensionConnected(false)
-        setStep(si, { state: 'error', detail: 'Extension chưa kết nối. Mở Google Flow + load extension rồi thử lại.' })
+      const flowStatus = await fetchAPI<{ connected: boolean; flow_key_present: boolean }>('/api/flow/status')
+      setExtensionConnected(!!flowStatus.connected)
+      setFlowKeyPresent(!!flowStatus.flow_key_present)
+      if (!flowStatus.connected) {
+        setStep(si, { state: 'error', detail: 'Extension chưa kết nối. Load extension trong Chrome rồi thử lại.' })
         setRunning(false)
         return
       }
-      setExtensionConnected(true)
+      if (!flowStatus.flow_key_present) {
+        setStep(si, { state: 'error', detail: 'Chưa có Flow key. Mở tab https://labs.google/fx/tools/flow và đăng nhập, rồi thử lại.' })
+        setRunning(false)
+        return
+      }
       setStep(si, { state: 'done' })
       si++
 
@@ -298,8 +308,15 @@ export default function CreatePage() {
   return (
     <div className="flex flex-col gap-4 max-w-3xl">
       {extensionConnected === false && (
-        <div className="rounded-lg p-3 text-xs" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid var(--red)', color: 'var(--red)' }}>
-          Extension chưa kết nối. Cần mở Google Flow và load extension trước khi tạo project (backend sẽ trả 503 nếu không).
+        <div className="rounded-lg p-3 text-xs flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid var(--red)', color: 'var(--red)' }}>
+          <span className="flex-1">Extension chưa kết nối. Load extension trong Chrome (chrome://extensions → Load unpacked → thư mục extension\) trước khi tạo project.</span>
+          <button type="button" onClick={refreshFlowStatus} className="px-2 py-1 rounded font-semibold shrink-0" style={{ background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}>Kiểm tra lại</button>
+        </div>
+      )}
+      {extensionConnected === true && flowKeyPresent === false && (
+        <div className="rounded-lg p-3 text-xs flex items-center gap-3" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid var(--yellow)', color: 'var(--yellow)' }}>
+          <span className="flex-1">Chưa có Flow key. Mở tab https://labs.google/fx/tools/flow và đăng nhập để extension bắt được token, rồi bấm "Kiểm tra lại". (Nếu không sẽ lỗi NO_FLOW_KEY khi upload/generate.)</span>
+          <button type="button" onClick={refreshFlowStatus} className="px-2 py-1 rounded font-semibold shrink-0" style={{ background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}>Kiểm tra lại</button>
         </div>
       )}
 
